@@ -27,7 +27,6 @@ class CsProj:
 		
 		#pprint.pprint(self.itemgroup)
 	def dump(self):
-		self.collect()
 		out = yaml.dump(self.itemgroup)
 		print out
 
@@ -67,9 +66,17 @@ class CsProj:
 		return [os.path.abspath(os.path.join(self.prjroot, f)) for f in 
 			self.itemgroup[group]['Include']]
 
+	def simplify(self):
+		self.itemgroup['Reference']['Include'] = [p.split(',')[0]
+			for p in self.itemgroup['Reference']['Include']]
+
+
+
+
 def do_dump(arg):
 	for fname in arg.file:
 		p = CsProj(fname)
+		p.simplify()
 		p.dump()
 
 def copy_group(tgt, src, group):
@@ -84,6 +91,7 @@ def do_merge(arg):
 	for group in ['Compile', 'ProjectReference', 'None']:
 		copy_group(tgt, src, group)
 
+	tgt.simplify()
 	tgt.dump()
 	tgt.save('c:/t/testmerge.csproj')
 
