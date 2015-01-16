@@ -27,6 +27,7 @@ class CsProj:
 		
 		#pprint.pprint(self.itemgroup)
 	def dump(self):
+		self.collect()
 		out = yaml.dump(self.itemgroup)
 		print out
 
@@ -39,49 +40,76 @@ class CsProj:
 		self.collect()
 		return
 
-	def append_to_group(self, gname, attrs) :
+	def append_to_group(self, gname, lattrs) :
 		parenthits = self.r.findall('.//{%s}ItemGroup/{%s}%s/..' % (ns, ns, gname), gname) 
 		
-		print attrs
-		print parenthits
 		parent = parenthits[0]
 		chi = parent.find('{%s}%s' % (ns, gname))
-		cl = copy.deepcopy(chi)
-		for k,v in attrs.items():
-			cl.set(k,v)
-		print cl
-		
-		parent.append(cl)
+
+		for attrs in lattrs:
+			cl = copy.deepcopy(chi)
+			for k,v in attrs.items():
+				cl.set(k,v)
+			#print cl
+			
+			parent.append(cl)
+
 
 
 	def save(self, fname):
 		self.t.write(fname, xml_declaration = True,
-           encoding = 'utf-8',
-           method = 'xml')
+			encoding = 'utf-8',
+			method = 'xml')
 
 		#os.system("less " + fname)
+
+	def files(self, group = 'Compile'):
+		return [os.path.abspath(os.path.join(self.prjroot, f)) for f in 
+			self.itemgroup[group]['Include']]
 
 def do_dump(arg):
 	for fname in arg.file:
 		p = CsProj(fname)
 		p.dump()
 
+def copy_group(tgt, src, group):
+	srcfiles = src.files(group)
+	tgrel = [os.path.relpath(p, tgt.prjroot) for p in srcfiles]
+	incs = [{'Include' : f} for f in tgrel]
+	tgt.append_to_group(group, incs)
+
+def do_merge(arg):
+	tgt = CsProj(arg.file[0])
+	src = CsProj(arg.file[1])
+	for group in ['Compile', 'ProjectReference', 'None']:
+		copy_group(tgt, src, group)
+
+	tgt.dump()
+	tgt.save('c:/t/testmerge.csproj')
+
+
 def do_add(arg):
 	prj = arg.file[0]
-	css = arg.file[1:]
-	print prj, css
+
 	p = CsProj(prj)
+	css = arg.file[1:]
+	relfiles = [os.path.relpath(os.path.abspath(f), p.prjroot ) for f in css]
+	csss = [{'Include' : f} for f in relfiles]
 
-
-	p.append_to_group('Compile', {'Include' : css[0]})
+	p.append_to_group('Compile', csss)
 
 	p.save("c:/t/test.csproj")
+
 def main():
 	args.init()
 	s = args.sub('dump', do_dump)
 	s.arg('file', nargs='+')
 	s = args.sub('add', do_add)
 	s.arg('file', nargs='+')
+
+	s = args.sub('merge', do_merge)
+	s.arg('file', nargs='+')
+
 	args.parse()
 
 main()
